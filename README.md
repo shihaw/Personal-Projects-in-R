@@ -1,29 +1,5 @@
-# First-Project-NBA Shot Chart
+Hello! My name is Austin Shih, and I am a junior at Vanderbilt University studying Applied Math and Data Science. 
+The bulk of my personal projects is working with sports data, so here's a ordered list of the projects I'm working on and ones I want to start on. 
 
----
-title: 'Project 1: Shot Chart Data'
-author: "Austin Shih"
-date: '2022-09-27'
-output: html_document
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
-```{r}
-require(tidyverse)
-
-nba <- read_csv('../data/nba_shotchartdetail_2018-19.csv')
-glimpse(nba)
-nba %>% 
-  filter(PLAYER_NAME == 'Kevin Durant') %>%
-  select(LOC_X,LOC_Y,SHOT_MADE_FLAG) %>%
-  ggplot(aes(x = LOC_X, y = LOC_Y, color = factor(SHOT_MADE_FLAG))) + 
-  geom_point(alpha = 0.5) + 
-  labs(title = "Kevin Durant Shot Chart", subtitle = "2018-19 Season") + 
-  geom_curve(x = -200, y = 0, xend = 200, yend = 0, curvature = -1.2, color = 'black') +
-  scale_color_manual(name = 'Make or Miss', 
-                     values = c('red', 'green'), 
-                     labels = c('Miss', 'Make'))
-                     
+Projects: 
+  1. NBA Shot Chart - NBA 2018-2019 season
