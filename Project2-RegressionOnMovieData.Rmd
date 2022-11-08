@@ -1,0 +1,172 @@
+---
+title: "Regression on Movie Data"
+author: "Austin Shih"
+date: '2022-11-08'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+- Research Question: Are longer movies more expensive to make? 
+```{r}
+library(tidyverse)
+mv <- readRDS('../data/mv.Rds')
+glimpse(mv)
+
+#looking at data and checking for missingness
+mv %>%
+  summarise(runtime, budget)
+mv %>%
+  drop_na(runtime) %>%
+  ggplot(aes(x = runtime)) +
+  geom_density() + 
+  labs(title = 'Runtime of Movies',
+       x = 'Runtime (min)', 
+       y = 'Density') + 
+  theme_bw()
+mv %>%
+  drop_na(budget) %>%
+  ggplot(aes(x = budget)) +
+  geom_density() + 
+  labs(title = 'Budget of Movies', 
+       x = 'Budget ($)', 
+       y = 'Density') +
+  scale_x_continuous(labels = scales::dollar) +
+  theme_bw()
+mv %>%
+  drop_na(runtime, budget) %>%
+  ggplot(aes(x = runtime, y = budget)) + 
+  geom_point(alpha = 0.5) + 
+  scale_y_log10(labels = scales::dollar) +
+  labs(title = 'Relationship Between Runtime and Movie Budget', 
+       x = 'Runtime (min)', 
+       y = 'Budget ($)') + 
+  geom_smooth(se=F) +
+  theme_bw() 
+
+#change budget values since skewed 
+mvAnalysis <- mv %>%
+  mutate(log_budget = log(budget)) %>%
+  select(runtime, log_budget) %>%
+  drop_na()
+
+#create regression values 
+m1 <- lm(log_budget ~ runtime, mvAnalysis)
+
+#looking at errors for predicting budget
+predictions1 <- predict(m1)
+mvAnalysis <- mvAnalysis %>%
+  mutate(predicted_budget = predictions1) %>%
+  mutate(errors = log_budget - predicted_budget) 
+mvAnalysis %>%
+  ggplot() + 
+  geom_histogram(aes(x = errors), bins = 50) + 
+  labs(title = 'Errors for Predicting Budget', 
+       subtitle = 'Do longer running movies cost more money to make?', 
+       x = 'Errors: Budget(logged) - Predicted', 
+       y = 'Number of Movies') + 
+  geom_vline(xintercept = 0, linetype = 'dashed') + 
+  theme_bw()
+
+#looking at errors against predicted budget 
+mvAnalysis %>%
+  ggplot(aes(x = predictions1, y = errors)) + 
+  geom_point(alpha = 0.5) + 
+  scale_x_log10(label = scales::dollar) +
+  geom_hline(yintercept = 0, linetype = 'dashed') + 
+  geom_smooth(se = F) + 
+  labs(title = 'Conditional Analysis of Errors', 
+       subtitle = 'Do longer running movies cost more money to make?', 
+       x = 'Predicted Budget', 
+       y = 'Errors: Budget(logged) - Predicted') + 
+  theme_bw()
+
+#which is better estimation of RMSE
+#regular RMSE 
+e <- resid(m1)
+se <- e^2
+mse <- mean(se)
+rmse <- sqrt(mse)
+rmse
+
+#cross validation 
+#want to test how good the data is when it wasn't randomly selected/didnt have access to
+set.seed(123)
+rmse_cv <- NULL
+for (i in 1:100) {
+  inds <- sample(x = 1:nrow(mvAnalysis), 
+                size = round(0.5*nrow(mvAnalysis)), 
+                replace = F)
+
+  train <- mvAnalysis %>%
+    slice(inds)
+  test <- mvAnalysis %>%
+    slice(-inds)
+
+  mTrain <- lm(log_budget ~ runtime, train)
+  mTrain
+
+  test <- test %>%
+    select(log_budget,runtime)
+
+  test$predY <- predict(mTrain, 
+                        newdata = test)
+  e <- test$log_budget - test$predY
+  se <- e^2
+  mse <- mean(se)
+  rmse <- sqrt(mse)
+  rmse
+  rmse_cv <- c(rmse_cv, rmse)
+}
+mean(rmse_cv)
+```
+
+> From our models, we can see a positive correlation between longer movies and movie budget, so our hypothesis was correct. Movies with longer runtimes tend to have a higher budget because more time and investment is involved in a longer running movie. Answering how well the model fits the data, we must look at the RMSE of the movie data. The estimation of the RMSE is better described in the cross validation process. The RMSE is the summary statistic describing how badly the model is creating mistakes both above and below the true values. The cross validation RMSE of 1.237 means that the logged budget is off by a factor of 1.237 logged dollars. From the conditional analysis of errors graph, the model overestimated low and high budget movies while properly estimated middle budget movies. In terms of the regression coefficients, a 1 minutes increase in runtime results in a 0.02381 increase in logged budget. 
+
+- Research Question: How much better can we predict budget with both runtime and score?
+```{r}
+library(tidyverse)
+mv <- readRDS('../data/mv.Rds')
+
+mvAnalysis2 <- mv %>%
+  mutate(log_budget = log(budget)) %>%
+  select(runtime, log_budget, score) %>%
+  drop_na()
+
+m2 <- (lm(log_budget ~ runtime + score,mvAnalysis2))
+
+e <- resid(m2)
+se <- e^2 
+mse <- mean(se) 
+rmse <- sqrt(mse)
+rmse 
+
+set.seed(123)
+rmse_cv2 <- NULL 
+for(i in 1:100){
+  #divide data into test and training sets 
+  inds <- sample(1:nrow(mvAnalysis2), size = 1590, replace = F)
+  train <- mvAnalysis2 %>%
+    slice(inds)
+  test <- mvAnalysis2 %>%
+    slice(-inds)
+  #run regression on train 
+  mTrain1 <- lm(log_budget ~ runtime, train)
+  mTrain2 <- lm(log_budget ~ runtime + score, train)
+  rmse_cv2 <- test %>%
+    mutate(preds1 = predict(mTrain1,newdata = test),
+           preds2 = predict(mTrain2,newdata = test)) %>%
+    summarise(rmse1 = sqrt(mean((log_budget - preds1)^2,na.rm=T)),
+              rmse2 = sqrt(mean((log_budget - preds2)^2,na.rm=T))) %>%
+    bind_rows(rmse_cv2) 
+}
+rmse_cv2 %>%
+  summarise_all(mean,na.rm=T) 
+mean(rmse_cv2$rmse1)
+mean(rmse_cv2$rmse2)
+```
+
+> Using score as an additinal predictor gives us a better estimation of the regression model and the RMSE value. Without score gives us a RMSE estimation of 1.237 while with score gives us an estimation of 1.200 which is much better. 
+> To answer the research question, there is evidence that shows that a longer movie tends to have a higher budget to make. This makes sense because movies with longer runtimes tend to have a higher budget because more time and investment is involved in a longer running movie.
