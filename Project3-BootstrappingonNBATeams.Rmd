@@ -1,0 +1,91 @@
+---
+title: 'Project 3: Bootstrapping on NBA Teams'
+author: "Austin Shih"
+date: '2022-11-08'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+- Research Question: Is home court advantage real? Is there any team with home court disadvantage? 
+```{r}
+library(tidyverse)
+gms <- readRDS('../data/game_summary.Rds') 
+glimpse(gms)
+
+#percentage of wins for all teams based on location of game 
+gms %>%
+  group_by(locationGame) %>%
+  summarise(avg_win = mean(isWin))
+
+#create value that calculates the home win vs away win difference 
+gms %>%
+  filter(isWin==TRUE) %>%
+  group_by(nameTeam) %>%
+  count(nameTeam,locationGame) %>% 
+  mutate(win_rate = n/(82*3)) %>%
+  select(-n) %>%
+  spread(locationGame, win_rate) %>%
+  mutate(win_diff=H-A) %>%
+  arrange(win_diff) 
+```
+
+> Teams won 58.5% of games at home versus 41.5% of games away, so “home court advantage” is real where teams win more games when playing at home. The San Antonio Spurs and the Minnesota Timberwolves had the largest win difference at home winning 14.6% more games at home than away. The Golden State Warriors had the smallest win difference at home winning 3.25% more at home than away. No team had a disadvantage because none of the values in the win_diff column was negative. A negative value would mean there were more percentage of wins away than home and therefore a disadvantage. The Golden State Warriors had the lowest “home court advantage”, but in terms of wins per season, they were first. This means that while playing a game at home does have an advantage, it doesn’t contribute as much to the total amount of wins a team has at the end of the season. 
+
+- Using bootstrapping, how confident are you that home court advantage exists? 
+```{r}
+library(tidyverse)
+gms <- readRDS('../data/game_summary.Rds') 
+
+set.seed(123)
+bsSeason <- NULL
+for(i in 1:1000) {
+  bsSeason <- gms %>%
+    sample_n(size = 200, Replace = T) %>%
+    group_by(locationGame) %>%
+    summarise(win_pct = mean(isWin)) %>%
+    spread(locationGame,win_pct) %>%
+    mutate(hca = H - A) %>%
+    bind_rows(bsSeason)
+}
+bsSeason %>%
+  mutate(h_wins = ifelse(H > A,1,0)) %>%
+  summarise(home_court_advtg = mean(h_wins))
+
+bsSeason %>%
+  gather("locationGame","win_pct") %>%
+  filter(locationGame %in% c('H', 'A')) %>%
+  ggplot(aes(x = win_pct,fill = locationGame)) + 
+  geom_density(alpha = .3) 
+```
+
+> I'm 98.8% confident that home court advantage is real because 988 of 1000 games simulated had the percentage of wins at home greater than the percentage of wins away. 
+
+- Using bootstrapping, is there evidence to support the conclusion that NBA teams get more rebounds at home compared to when they are away?
+```{r}
+library(tidyverse)
+gms <- readRDS('../data/game_summary.Rds') 
+
+set.seed(123)
+bsSeason <- NULL
+for(i in 1:1000) {
+  bsSeason <- gms %>%
+    sample_n(size = 200, Replace = T) %>%
+    group_by(locationGame) %>%
+    summarise(avgReb = mean(treb,na.rm=T),.groups = 'drop') %>%
+    spread(locationGame,avgReb) %>%
+    bind_rows(bsSeason)
+}
+bsSeason %>%
+  mutate(REBhca = ifelse(H>A, 1, 0)) %>%
+  summarise(REBhca = mean(REBhca))
+bsSeason %>%
+  gather("locationGame","avgReb")%>%
+  ggplot(aes(x = avgReb,fill = locationGame)) + 
+  geom_density(alpha = .3) 
+```
+
+> There is evidence that teams get more rebounds at Home games compared to Away games. I am 91.1% confident about this conclusion. 
+
