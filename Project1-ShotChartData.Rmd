@@ -54,3 +54,29 @@ nba %>%
 ```
 
 - League Average 
+```{r}
+library(tidyverse)
+nba <- read_csv('../data/nba_shotchartdetail_2018-19.csv')
+
+league <- nba %>%
+  count(EVENT_TYPE) %>%
+  mutate(league_avg = n/sum(n)) %>%
+  filter(EVENT_TYPE == 'Made Shot') %>%
+  select(league_avg)
+
+player <- nba %>%
+  group_by(PLAYER_NAME) %>%
+  count(EVENT_TYPE) %>%
+  mutate(shooting_pct = n/sum(n)) %>%
+  filter(EVENT_TYPE == 'Made Shot') %>%
+  arrange(-shooting_pct) 
+
+
+shooting <- NULL
+shooting <- cbind(player, league) 
+
+shooting %>%
+  mutate(diff = shooting_pct - league_avg) %>%
+  ggplot(aes(x = diff, y = n)) + 
+  geom_point() 
+```
