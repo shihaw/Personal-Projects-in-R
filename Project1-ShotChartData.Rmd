@@ -9,14 +9,14 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-- Shot Chart of JJ Redick in the 2018-2019 Season 
+- Shot Chart of Kevin Durant in the 2018-2019 Season 
 ```{r}
 require(tidyverse)
 
 nba <- read_csv('../data/nba_shotchartdetail_2018-19.csv')
 glimpse(nba)
 nba %>% 
-  filter(PLAYER_NAME == 'JJ Redick') %>%
+  filter(PLAYER_NAME == 'Kevin Durant') %>%
   select(LOC_X,LOC_Y,SHOT_MADE_FLAG) %>%
   ggplot(aes(x = LOC_X, y = LOC_Y, color = factor(SHOT_MADE_FLAG))) + 
   geom_point(alpha = 0.5) + 
@@ -29,9 +29,6 @@ nba %>%
 
 - Who had the highest shooting percentage among players who shot more than 500 shots in the season? 
 ```{r}
-library(tidyverse)
-nba <- read_csv('../data/nba_shotchartdetail_2018-19.csv')
-
 nba %>%
   group_by(PLAYER_NAME) %>%
   count(EVENT_TYPE) %>%
@@ -42,22 +39,8 @@ nba %>%
 ```
 > Rudy Gobert had the highest shooting percentage at 66.9% 
 
-```{r}
-library(tidyverse)
-nba <- read_csv('../data/nba_shotchartdetail_2018-19.csv')
-
-nba %>%
-  filter(PLAYER_NAME == 'Stephen Curry') %>%
-  ggplot(aes(x = LOC_X, y = LOC_Y, color = SHOT_ZONE_RANGE)) + 
-  geom_point(alpha = 0.5) + 
-  theme(legend.position = 'bottom') 
-```
-
 - League Average 
 ```{r}
-library(tidyverse)
-nba <- read_csv('../data/nba_shotchartdetail_2018-19.csv')
-
 league <- nba %>%
   count(EVENT_TYPE) %>%
   mutate(league_avg = n/sum(n)) %>%
@@ -71,12 +54,40 @@ player <- nba %>%
   filter(EVENT_TYPE == 'Made Shot') %>%
   arrange(-shooting_pct) 
 
-
 shooting <- NULL
 shooting <- cbind(player, league) 
 
 shooting %>%
-  mutate(diff = shooting_pct - league_avg) %>%
-  ggplot(aes(x = diff, y = n)) + 
-  geom_point() 
+  ggplot(aes(x = shooting_pct, y = n)) + 
+  geom_point(alpha = 0.5) + 
+  geom_vline(xintercept = 0.4605072, color = 'red') + 
+  labs(title = 'Player Shooting Average vs NBA Shooting Average', 
+       x = 'Player - NBA Shooting Average', 
+       y = 'Number of Made Shots')
+  
 ```
+> The more shots a player makes, the closer a player's shooting average is to the NBA shooting average. 
+
+- Highest Point Scorers Per Month
+```{r}
+points <- nba %>%
+  group_by(PLAYER_NAME) %>%
+  mutate(points_scored = 0) %>%
+  filter(EVENT_TYPE == 'Made Shot') %>%
+  mutate(points_scored = ifelse(SHOT_TYPE == '3PT Field Goal', points_scored + 3,
+                                ifelse(SHOT_TYPE == '2PT Field Goal', points_scored + 2, points_scored + 0))) %>%
+  ungroup()
+
+points %>%
+  mutate(GAME_DATE = as.Date(factor(GAME_DATE), format = '%Y%m%d')) %>%
+  group_by(PLAYER_NAME,GAME_ID) %>%
+  mutate(game_points = sum(points_scored)) %>%
+  ungroup() %>%
+  group_by(PLAYER_NAME,month = lubridate::floor_date(GAME_DATE, 'month')) %>%
+  mutate(month_points = sum(game_points)) %>%
+  ungroup() %>%
+  distinct(PLAYER_NAME,month,month_points) %>%
+  arrange(-month_points)
+```
+> James Harden had the most amount of points scored in a month with 5799 points in the month of January 2019. 
+
