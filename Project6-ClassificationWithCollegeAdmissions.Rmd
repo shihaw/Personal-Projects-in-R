@@ -1,0 +1,307 @@
+---
+title: 'Project 5: Classification on College Admissions'
+author: "Austin Shih"
+date: "2022-12-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+require(tidyverse)
+require(tidymodels)
+require(scales)
+
+ad <- readRDS('../data/admit_data.rds')
+set.seed(123)
+```
+
+Run Univariate, Multivariate, and Conditional visualization on interested data.
+```{r}
+glimpse(ad)
+
+ad %>%
+  ggplot(aes(x = factor(yield))) + 
+  geom_bar() + 
+  labs(title = 'Student Enrollment', 
+       subtitle = '1 = Enrolled, 0 = Not Enrolled', 
+       x = 'Yield', 
+       y = 'Number of Students')
+
+ad %>%
+  ggplot(aes(x = income)) + 
+  geom_density() + 
+  labs(title = 'Student Income', 
+       x = 'Income', 
+       y = 'Density') + 
+  scale_x_continuous(labels = dollar)
+
+ad %>%
+  ggplot(aes(x = sat)) + 
+  geom_density() + 
+  labs(title = 'Student SAT Scores', 
+       x = 'SAT Score', 
+       y = 'Density')
+
+ad %>%
+  ggplot(aes(x = income, color = factor(yield))) + 
+  geom_density() + 
+  labs(title = 'Income of Enrolled and Non-Enrolled Students', 
+       subtitle = '1 = Enrolled, 0 = Not Enrolled', 
+       x = 'Income', 
+       y = 'Density', 
+       color = 'Yield') + 
+  scale_x_continuous(labels = dollar)
+
+ad %>%
+  ggplot(aes(x = sat, color = factor(yield))) + 
+  geom_density() + 
+  labs(title = 'SAT Score of Enrolled and Non-Enrolled Students', 
+       subtitle = '1 = Enrolled, 0 = Not Enrolled', 
+       x = 'SAT Score', 
+       y = 'Density', 
+       color = 'Yield')
+
+ad %>%
+  mutate(sat_decile = ntile(sat,n=10), 
+         income_decile = ntile(income,n=10)) %>% 
+  group_by(sat_decile, income_decile) %>%
+  summarise(pr_attend = mean(yield),.groups = 'drop') %>%
+  ggplot(aes(x = factor(income_decile),y = factor(sat_decile),
+             fill = pr_attend)) + 
+  geom_tile() + 
+  scale_fill_gradient(limits = c(0,1), 
+                      low = 'grey80',
+                      high = 'darkred') + 
+  labs(title = 'Heat Map of Income, Yield, and SAT', 
+       subtitle = '1 = Enrolled, 0 = Not Enrolled', 
+       x = 'Income Deciles', 
+       y = 'SAT Deciles', 
+       fill = 'Predict Enrollment')
+```
+
+> Yield only has two variables (0 and 1), so it can be classified as a categorical variable and described with a bar graph. Income and SAT are both continuous variables, so they both can be described with density graphs. Yield-income and yield-sat can both be described using density graphs since its comparing a binary and continuous variables. The graphs show that there are more non-enrolled students with less income and lower SAT scores than enrolled students. The pattern in the SAT graph shows that most students have a SAT score from 1150 to 1250 because lesser students tend to score higher than 1300 and lower than 1100. An SAT score of 1150 to 1250 is generally the average SAT score for most students. Students in the 10th decile for Income and SAT are most likely to enroll, while students in the 1st decile for Income and SAT are least likely to enroll. Income matters more for enrollment because students in the 10th decline for SAT but 1st decile for Income are more likely to enroll than students in the 1st decile for SAT and 10th decile for Income. 
+
+Simply predict attendance using the conditional mean. 
+
+```{r}
+ad %>%
+  mutate(incomeDec = ntile(income, n=10), 
+         satDec = ntile(sat, n=10)) %>%
+  group_by(incomeDec, satDec) %>%
+  mutate(prob_attend = mean(yield)) %>%
+  mutate(pred_attend = ifelse(prob_attend > 0.5, 1, 0)) %>%
+  ungroup() %>%
+  group_by(yield) %>%
+  mutate(total_attend = n()) %>%
+  group_by(yield,pred_attend,total_attend) %>%
+  summarise(nStudents=n(),.groups = 'drop') %>%
+  mutate(prop = nStudents / total_attend) %>%
+  ungroup() %>%
+  mutate(accuracy = percent(sum((yield == pred_attend)*nStudents) / sum(nStudents)))
+#accuracy - (535 + 1255) / 2150 = 83.26%
+#sensitivity - 1255 / 1466 = 85.60%
+#specificity - 535 / 684 = 78.21%
+```
+
+> The accuracy is the number of correctly predicited students that enrolled and weren't enrolled, so the accuracy value is (535 + 1255) / 2150 = 83.26%. The sensitivity is only looking looking at attendees (students with yield=1), so the sensitivity value is 1255 / 1466 = 85.60%. The specificity is only looking at non-attendees (students with yield=0), so the specificity value is 535 / 684 = 78.21%.
+
+Predict whether students will attend using a linear regression model (using the `lm()` function) that predicts `yield` as a function of `income` and `sat`. Does this model do better than the previous question? 
+
+```{r}
+mLM <- lm(yield ~ income + sat, ad)
+ad %>%
+  mutate(prob_attend = predict(mLM)) %>%
+  mutate(pred_attend = ifelse(prob_attend > .5,1,0)) %>%
+  group_by(yield) %>%
+  mutate(total_attend = n()) %>%
+  group_by(yield,pred_attend,total_attend) %>%
+  summarise(nStudents=n(),.groups = 'drop') %>%
+  mutate(prop = nStudents / total_attend) %>%
+  ungroup() %>%
+  mutate(accuracy = percent(sum((yield == pred_attend)*nStudents) / sum(nStudents)))
+#accuracy is (366 + 1345) / 2150 = 79.58%
+#sensitivity is 1345 / 1466 = 91.75%
+#specificity is 366 / 684 = 53.51%
+```
+
+> The accuracy is the number of correctly predicited students that enrolled and weren't enrolled, so the accuracy value is (366 + 1345) / 2150 = 79.58%. The sensitivity is only looking looking at attendees (students with yield=1), so the sensitivity value is 1345 / 1466 = 91.75%. The specificity is only looking at non-attendees (students with yield=0), so the specificity value is 366 / 684 = 53.51%. This model was worse in accuracy and specificity, but it was better in sensitivity. 
+
+Find the optimal threshold to balance the trade-off between sensitivity and specificity? Then plot ROC Curve and calculate the AUC.
+
+```{r}
+thresholdRes1 <- NULL
+for(thresh in seq(0,1,by = .025)) {
+  thresholdRes1 <- ad %>%
+    mutate(prob_attend = predict(mLM)) %>%
+    mutate(pred_attend = ifelse(prob_attend > thresh,1,0)) %>%
+    ungroup() %>%
+    group_by(yield) %>%
+    mutate(total_attend = n()) %>%
+    group_by(yield,pred_attend,total_attend) %>%
+    summarise(nStudents = n(),.groups = 'drop') %>%
+    mutate(prop = nStudents / total_attend) %>%
+    mutate(threshold = thresh) %>%
+    bind_rows(thresholdRes1)
+}
+
+thresholdRes1 %>%
+  filter(yield == pred_attend) %>%
+  ggplot(aes(x = threshold,y = prop,
+             color = factor(yield))) + 
+  geom_line() + 
+  labs(title = 'Threshold Graph', 
+       x = 'Threshold', 
+       y = 'Proportion') + 
+  scale_color_discrete(name = 'Metric', labels = c('Sensitivity','Specificity'))
+
+thresholdRes1 %>%
+  mutate(metric = ifelse(yield == 1 & pred_attend == 1,'Sensitivity',
+                         ifelse(yield == 0 & pred_attend == 0,'Specificity',NA))) %>%
+  drop_na(metric) %>%
+  select(prop,metric,threshold) %>%
+  spread(metric,prop,fill = 0) %>%
+  ggplot(aes(x = 1-Specificity,y = Sensitivity)) + 
+  geom_line() + 
+  xlim(c(0,1)) + ylim(c(0,1)) + 
+  geom_abline(slope = 1,intercept = 0,linetype = 'dotted') + 
+  labs(title = 'ROC Curve')
+
+roc_auc(data = ad %>%
+  mutate(pred_attend = predict(mLM),
+         truth = factor(yield,levels = c('1','0'))) %>%
+  select(truth,pred_attend),truth,pred_attend)
+```
+
+> The optimal threshold to balance the trade-off between sensitivity and specificity is about 0.59. The AUC is 0.875 which summarizes the classification performance. 
+
+Does this perform better than a linear regression model?
+
+```{r}
+mLogit <- glm(yield ~ sat + income,
+              ad,family = binomial(link = 'logit'))
+
+predict <- ad %>%
+  mutate(prob_attend = predict(mLogit,type = 'response')) %>%
+  mutate(pred_attend = ifelse(prob_attend > .5,1,0))
+
+eval <- predict %>%
+  group_by(yield) %>%
+  mutate(total_attend = n()) %>%
+  group_by(yield,pred_attend,total_attend) %>%
+  summarise(nStudents=n(),.groups = 'drop') %>%
+  mutate(prop = nStudents / total_attend) %>%
+  ungroup() %>%
+  mutate(accuracy = percent(sum((yield == pred_attend)*nStudents) / sum(nStudents)))
+
+toplot <- NULL
+for(thresh in seq(0,1,by = .025)) {
+  toplot <- predict %>%
+    mutate(pred_attend = ifelse(predict(mLogit,type = 'response') > thresh,1,0)) %>%
+    group_by(yield) %>%
+    mutate(total_attend = n()) %>%
+    group_by(yield,pred_attend,total_attend) %>%
+    summarise(nStudents=n(),.groups = 'drop') %>%
+    mutate(prop = nStudents / total_attend) %>%
+    ungroup() %>%
+    mutate(threshold = thresh) %>%
+    bind_rows(toplot)
+}
+
+toplot %>%
+  filter(yield == pred_attend) %>%
+  ggplot(aes(x = threshold,y = prop,
+             color = factor(yield))) + 
+  geom_line() + 
+  labs(title = 'Threshold Graph', 
+       x = 'Threshold', 
+       y = 'Proportion') + 
+  scale_color_discrete(name = 'Metric', labels = c('Sensitivity','Specificity'))
+
+toplot %>%
+  mutate(metric = ifelse(yield == 1 & pred_attend == 1,'Sensitivity',
+                         ifelse(yield == 0 & pred_attend == 0,'Specificity',NA))) %>%
+  drop_na(metric) %>%
+  select(prop,metric,threshold) %>%
+  spread(metric,prop,fill=0) %>%
+  ggplot(aes(x = 1-Specificity,y = Sensitivity)) + 
+  geom_line() + 
+  xlim(c(0,1)) + ylim(c(0,1)) + 
+  geom_abline(slope = 1,intercept = 0,linetype = 'dotted') + 
+  labs(title = 'ROC Curve')
+
+roc_auc(data = predict %>%
+  mutate(prob_attend = predict(mLogit,type = 'response'),
+         truth = factor(yield,levels = c('1','0'))) %>%
+  select(truth,prob_attend),truth,prob_attend)
+```
+
+> The optimal threshold to balance the trade-off between sensitivity and specificity is about 0.63. The AUC is 0.897 which summarizes the classification performance. The logistic regression model performed better than the linear regression model since it had a higher AUC value. 
+
+Now use a random forest using the ranger package. What is wrong with this? 
+
+```{r}
+require(ranger)
+
+mRang <- ranger(yield ~ income + sat, ad)
+
+pred <- predict(mRang, ad)
+
+ad %>%
+  mutate(pred_attend = ifelse(pred$predictions > .5,1,0)) %>%
+  group_by(yield) %>%
+  mutate(total_attend = n()) %>%
+  group_by(yield,pred_attend,total_attend) %>%
+  summarise(nStudents=n(),.groups = 'drop') %>%
+  mutate(prop = nStudents / total_attend) %>%
+  ungroup() %>%
+  mutate(accuracy = percent(sum((yield == pred_attend)*nStudents) / sum(nStudents)))
+
+rang <- NULL
+for(thresh in seq(0,1,by = .025)) {
+  rang <- ad %>%
+    mutate(pred_attend = ifelse(pred$predictions > thresh,1,0)) %>%
+    ungroup() %>%
+    group_by(yield) %>%
+    mutate(total_attend = n()) %>%
+    group_by(yield,pred_attend,total_attend) %>%
+    summarise(nStudents = n(),.groups = 'drop') %>%
+    mutate(prop = nStudents / total_attend) %>%
+    mutate(threshold = thresh) %>%
+    bind_rows(rang)
+}
+
+rang %>%
+  filter(yield == pred_attend) %>%
+  ggplot(aes(x = threshold,y = prop,
+             color = factor(yield))) + 
+  geom_line() + 
+  labs(title = 'Threshold Graph', 
+       x = 'Threshold', 
+       y = 'Proportion') + 
+  scale_color_discrete(name = 'Metric', labels = c('Sensitivity','Specificity'))
+
+rang %>%
+  mutate(metric = ifelse(yield == 1 & pred_attend == 1,'Sensitivity',
+                         ifelse(yield == 0 & pred_attend == 0,'Specificity',NA))) %>%
+  drop_na(metric) %>%
+  select(prop,metric,threshold) %>%
+  spread(metric,prop,fill = 0) %>%
+  ggplot(aes(x = 1-Specificity,y = Sensitivity)) + 
+  geom_line() + 
+  xlim(c(0,1)) + ylim(c(0,1)) + 
+  geom_abline(slope = 1,intercept = 0,linetype = 'dotted') + 
+  labs(title = 'ROC Curve')
+
+trained <- ad %>%
+  mutate(pr_attend = pred$predictions)
+
+roc_auc(data = trained %>%
+          mutate(yield = factor(yield,
+                                levels = c('1','0'))),
+        truth = yield,estimate = pr_attend)
+```
+
+> The accuracy is (677 + 1461) / 2150 = 99.44%. The sensitivity is 1461 / 1466 = 99.66%. The specificity is 677 / 684 = 98.98%. The optimal threshold to balance the trade-off between sensitivity and specificity is about 0.51. The AUC is 0.9998 which summarizes the classification performance. We should not be over-excited because ranger overfits the data which makes the AUC too good. To compensate, we must use the cross validation loop and use a train and test set. 
