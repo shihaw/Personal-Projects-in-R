@@ -1,0 +1,67 @@
+---
+title: "Weather Project"
+author: "Austin Shih"
+date: "2022-11-30"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+ ***Weather data base was manually created***
+
+ ***Over 2021, does the time of sunrise have an effect on the average temperature, humidity, and wind speed per month in Nashville, TN? Is the effect the same for Cape Town, South Africa, which is in the Southern Hemisphere? ***
+```{r}
+library(tidyverse)
+library(scales)
+library(ggridges)
+wthr <- read_csv('../data/WeatherData.csv')
+
+wthr <- wthr %>%
+  mutate(month = factor(Date, levels = month.abb))
+
+wthr %>%
+  ggplot(aes(x = month, y = AvgTemp, color = Location)) + 
+  geom_point() + 
+  theme_ridges()
+
+wthr %>%
+  ggplot(aes(x = month, y = AvgHum, color = Location)) + 
+  geom_point() + 
+  theme_ridges()
+
+wthr %>%
+  ggplot(aes(x = month, y = AvgWindSpd, color = Location)) + 
+  geom_point() + 
+  theme_ridges()
+
+wthr %>%
+  ggplot(aes(x = AvgSunrise, y = AvgTemp, color = Location)) + 
+  geom_point() + 
+  geom_smooth(method = lm, se = F) + 
+  labs(title = 'Average Time of Sunrise vs. Average Temperature', 
+       x = 'Average Time of Sunrise', 
+       y = 'Average Temperature (F)') + 
+  theme_ridges()
+
+wthr %>%
+  ggplot(aes(x = AvgSunrise, y = AvgHum, color = Location)) + 
+  geom_point() + 
+  geom_smooth(method = lm, se = F) + 
+  labs(title = 'Average Time of Sunrise vs. Average Humidity', 
+       x = 'Average Time of Sunrise', 
+       y = 'Average Humidity (%)') + 
+  theme_ridges()
+
+wthr %>%
+  ggplot(aes(x = AvgSunrise, y = AvgWindSpd, color = Location)) + 
+  geom_point() + 
+  geom_smooth(method = lm, se = F) + 
+  labs(title = 'Average Time of Sunrise vs. Average Wind Speed', 
+       x = 'Average Time of Sunrise', 
+       y = 'Average Wind Speed (mph)') + 
+  theme_ridges() 
+```
+
+> My experiment showed that there is a strong correlation between time of sunrise and temperature. As the time of sunrise becomes later, the average temperature gets lower. However, there doesn’t seem to be any correlation between time of sunrise and humidity and wind speed. Most fluctuations and difference in measurements between the two cities are mostly due to geographical differences rather than difference in hemispheres 
