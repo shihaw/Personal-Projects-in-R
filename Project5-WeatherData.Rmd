@@ -66,4 +66,7 @@ wthr %>%
   theme_ridges() 
 ```
 
-> My experiment showed that there is a strong correlation between time of sunrise and temperature. As the time of sunrise becomes later, the average temperature gets lower. However, there doesn’t seem to be any correlation between time of sunrise and humidity and wind speed. Most fluctuations and difference in measurements between the two cities are mostly due to geographical differences rather than difference in hemispheres 
+> My experiment showed that there is a strong correlation between time of sunrise and temperature. 
+> As the time of sunrise becomes later, the average temperature gets lower. 
+> However, there doesn’t seem to be any correlation between time of sunrise and humidity and wind speed. 
+> Most fluctuations and difference in measurements between the two cities are mostly due to geographical differences rather than difference in hemispheres. 
