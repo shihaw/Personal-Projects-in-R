@@ -8,3 +8,4 @@ Projects:
   4. In progress
   5. Analysis on Weather, Time, and Geography - Self Created Weather Data 
   6. Classification on College Students - Admission Data for Unknown College
+  7. Creating Maps - COVID/President Data
