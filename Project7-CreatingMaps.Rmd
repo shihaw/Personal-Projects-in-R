@@ -1,0 +1,135 @@
+---
+title: 'Project 7: Creating Maps'
+author: "Austin Shih"
+date: "2022-12-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+require(tidyverse)
+require(maps)
+
+
+states48 <- map_data('state')
+
+states48 %>%
+  as_tibble()
+
+# plot a map
+states48 %>%
+  as_tibble() %>%
+  ggplot() + 
+  geom_polygon(aes(x = long,y = lat,
+                   group = group),
+               color = 'black',
+               fill = 'grey70') + 
+  theme_void()
+
+states48 %>%
+  as_tibble()
+
+whereIveBeenTo <- c('new york','california','massachusetts','vermont',
+                   'district of columbia','connecticut','tennessee', 
+                   'colorado', 'kansas', 'missouri','indiana',
+                   'texas','florida','alabama','florida',
+                   'georgia','kentucky','north carolina','south carolina',
+                   'maryland','pennsylvania','new jersey','rhode island',
+                   'new hampshire')  
+
+states48 %>%
+  mutate(been = ifelse(region %in% whereIveBeenTo,
+                        'Been here','Have not been here')) %>%
+  ggplot() + 
+  geom_polygon(aes(x = long,y = lat,group = group,
+                   fill = been),
+               color = 'black') + 
+  theme_void()
+
+poll <- readRDS('../data/PresStatePolls04to20.Rds')
+
+poll2020 <- poll %>%
+  as_tibble() %>%
+  filter(year == 2020) %>%
+  group_by(state.name) %>%
+  summarise(DemPct = mean(dem.poll,na.rm=T),
+            RepPct = mean(rep.poll,na.rm=T))
+
+states48 <- states48 %>%
+  as_tibble() %>%
+  left_join(poll2020,
+            by = c('region' = 'state.name'))
+
+states48 %>%
+  ggplot() + 
+  geom_polygon(aes(x = long,y = lat,group = group,
+                   fill = DemPct),
+               color = 'black') + 
+  theme_void() + 
+  scale_fill_stepsn(breaks = c(30,35,40,49,51,60,65,70),
+                    colors = c('darkred','red','tomato',
+                               'grey80',
+                               'skyblue','blue','darkblue'))
+
+covid <- readRDS('../data/countycovid.Rds')
+
+covid %>%
+  ggplot(aes(x = deaths)) + 
+  geom_density()
+glimpse(covid)
+
+covid %>%
+  as_tibble() %>%
+  #proportion of deaths to population (deaths per 100000 people)
+  mutate(deathsPC = deaths*100000 / population) %>%
+  ggplot() + 
+  geom_polygon(aes(x = long,y = lat,
+                   group = group,
+                   fill = deathsPC)) + 
+  geom_polygon(data = states48,
+               aes(x = long,y = lat,
+                   group = group),
+               color = 'black',fill = NA) + 
+  theme_void() + 
+  scale_fill_continuous(low = 'white',
+                        high = 'red')
+#deaths are higher in areas that also support Trump 
+
+counties <- map_data('county') %>% as_tibble()
+
+jbCounties <- c('middlesex:massachusetts','williamson:tennessee')
+
+counties <- counties %>%
+  mutate(combReg = paste0(subregion,":",region)) %>%
+  mutate(jbLived = ifelse(combReg %in% jbCounties,'Lived',
+                          'Never lived'))
+  
+counties %>%
+  as_tibble() %>%
+  ggplot(aes(x = long,y = lat,group = group,
+             fill = jbLived)) + 
+  geom_polygon() + 
+  theme_void()
+
+jbLivedDF <- data.frame(combReg = jbCounties,
+                        years = c(2,18))
+
+counties <- counties %>% 
+  left_join(jbLivedDF, by = 'combReg')
+
+counties %>%
+  ggplot() + 
+  geom_polygon(aes(x = long,y = lat,group = group),
+               fill = 'grey95',color = 'grey70') + 
+  geom_point(data = counties %>%
+               drop_na(years) %>%
+               group_by(group,years) %>%
+               summarise(long = mean(long),lat = mean(lat)),
+             aes(x = long,y = lat,size = years),shape = 21,color = 'red') + 
+  theme_void() + 
+  scale_size_continuous(range = c(2,10),breaks = c(2,18)) + 
+  coord_map('albers',lat0 = 30,lat1 = 40)
+```
