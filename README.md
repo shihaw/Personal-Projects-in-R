@@ -6,4 +6,5 @@ Projects:
   2. Regression on Movie Data - Internet Movie Data Based 
   3. Bootstrapping on NBA Teams - NBA 2017-2019 season
   4. In progress
-  5. 
+  5. Analysis on Weather, Time, and Geography - Self Created Weather Data 
+  6. Classification on College Students - Admission Data for Unknown College
