@@ -9,9 +9,10 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-  - Weather data base was manually created - 
+  - Weather data base was manually created
 
- - Over 2021, does the time of sunrise have an effect on the average temperature, humidity, and wind speed per month in Nashville, TN? Is the effect the same for Cape Town, South Africa, which is in the Southern Hemisphere? - 
+ - Over 2021, does the time of sunrise have an effect on the average temperature, humidity, and wind speed per month in Nashville, TN? 
+ - Is the effect the same for Cape Town, South Africa, which is in the Southern Hemisphere?
 
 ```{r}
 library(tidyverse)
