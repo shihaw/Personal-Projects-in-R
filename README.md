@@ -1,4 +1,4 @@
-Hello! My name is Austin Shih, and I am a junior at Vanderbilt University studying Applied Math and Data Science. 
+Hello! My name is Austin Shih, and I'm a junior at Vanderbilt University studying Applied Math and Data Science. 
 The bulk of my personal projects is working with sports data, so here's a ordered list of the projects I'm working on and ones I want to start on. 
 
 Projects: 
