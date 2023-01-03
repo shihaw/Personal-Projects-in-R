@@ -1,5 +1,5 @@
 ---
-title: 'Project 1: Shot Chart Data'
+title: 'Project 1: Shot Chart Data (No Free Throws Accounted)'
 author: "Austin Shih"
 date: '2022-09-27'
 output: html_document
@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 - Shot Chart of Kevin Durant in the 2018-2019 Season 
 ```{r}
 require(tidyverse)
+require(dplyr)
 
 nba <- read_csv('../data/nba_shotchartdetail_2018-19.csv')
 glimpse(nba)
@@ -64,13 +65,13 @@ shooting %>%
   labs(title = 'Player Shooting Average vs NBA Shooting Average', 
        x = 'Player - NBA Shooting Average', 
        y = 'Number of Made Shots')
-  
 ```
 > The more shots a player makes, the closer a player's shooting average is to the NBA shooting average. 
 
 - Highest Point Scorers Per Month
 ```{r}
 points <- nba %>%
+  mutate(GAME_DATE = as.Date(factor(GAME_DATE), format = '%Y%m%d')) %>%
   group_by(PLAYER_NAME) %>%
   mutate(points_scored = 0) %>%
   filter(EVENT_TYPE == 'Made Shot') %>%
@@ -79,15 +80,58 @@ points <- nba %>%
   ungroup()
 
 points %>%
-  mutate(GAME_DATE = as.Date(factor(GAME_DATE), format = '%Y%m%d')) %>%
+  group_by(PLAYER_NAME) %>%
+  mutate(season_points = sum(points_scored)) %>%
+  select(PLAYER_NAME, season_points) %>%
+  distinct() %>%
+  arrange(-season_points)
+
+points <- points %>%
   group_by(PLAYER_NAME,GAME_ID) %>%
   mutate(game_points = sum(points_scored)) %>%
-  ungroup() %>%
+  ungroup()
+
+points %>%
+  select(GAME_ID, PLAYER_NAME, GAME_DATE, game_points) %>%
+  distinct() %>% 
   group_by(PLAYER_NAME,month = lubridate::floor_date(GAME_DATE, 'month')) %>%
   mutate(month_points = sum(game_points)) %>%
-  ungroup() %>%
-  distinct(PLAYER_NAME,month,month_points) %>%
+  select(PLAYER_NAME, month, month_points) %>%
+  distinct() %>%
   arrange(-month_points)
 ```
-> James Harden had the most amount of points scored in a month with 5799 points in the month of January 2019. 
+> James Harden had the most amount of points scored in a month with 436 points in the month of January 2019. 
+
+- Average PPG for James Harden by month 
+```{r}
+points %>%
+  filter(PLAYER_NAME == 'James Harden') %>%
+  select(GAME_ID, PLAYER_NAME, GAME_DATE, game_points) %>%
+  distinct() %>% 
+  group_by(month = lubridate::floor_date(GAME_DATE, 'month')) %>%
+  mutate(month_points = sum(game_points)) %>%
+  select(PLAYER_NAME, month, month_points) %>%
+  distinct() %>%
+  ggplot(aes(x = month, y = month_points)) + 
+  geom_bar(stat = 'identity') + 
+  labs(title = 'James Harden - Total Points', 
+       subtitle = 'Not Counting Free Throws',
+       x = 'Month', 
+       y = 'Points in a Month')
+
+points %>%
+  filter(PLAYER_NAME == 'James Harden') %>%
+  select(GAME_ID, PLAYER_NAME, GAME_DATE, game_points) %>%
+  distinct() %>%
+  group_by(month = lubridate::floor_date(GAME_DATE, 'month')) %>%
+  mutate(avg_month_points = mean(game_points)) %>%
+  select(PLAYER_NAME, month, avg_month_points) %>%
+  distinct() %>%
+  ggplot(aes(x = month, y = avg_month_points)) + 
+  geom_bar(stat = 'identity') + 
+  labs(title = 'James Harden - PPG', 
+       subtitle = 'Not Counting Free Throws',
+       x = 'Month', 
+       y = 'Average PPG per month')
+```
 
